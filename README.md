@@ -13,9 +13,7 @@ AlloyDB is a lightweight, file-based vector database designed to be an alternati
 
 ### Installation
 
-bashCopy code
-
-`pip install alloydb`
+`cargo add alloydb`
 
 ### Basic Usage
 
