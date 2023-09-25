@@ -11,6 +11,8 @@ tokio = "1.32.0"
 tokenizers = "0.14.0"
 anyhow = "1.0.75"
 rkyv = "0.7.42"
+byteorder = "1.4.3"
+fs2 = "0.4.3"
 [dependencies.uuid]
 version = "1.4.1"
 features = [
