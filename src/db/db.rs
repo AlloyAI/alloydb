@@ -15,6 +15,21 @@ pub struct AlloyDB {
     file_path: String,
 }
 
+struct AlloyDBHeader {
+    magic_number: [u8; 4],
+    version: u16,
+    metadata_offset: u64,
+    index_offset: u64,
+    vector_data_offset: u64,
+    total_records: u64,
+}
+
+struct AlloyDBOffsets {
+    initial_metadata_offset: u64,
+    initial_index_offset: u64,
+    initial_vector_data_offset: u64,
+}
+
 impl AlloyDB {
     pub fn new(file_path: String) -> Self {
         Self { file_path }
@@ -25,6 +40,15 @@ impl AlloyDB {
 
         // Lock the file for exclusive access
         file.lock_exclusive()?;
+
+        let header = AlloyDBHeader {
+            magic_number: *MAGIC_NUMBER,
+            version: VERSION,
+            metadata_offset: 0,
+            index_offset: 0,
+            vector_data_offset: 0,
+            total_records: 0,
+        };
 
         // Write header information
         file.write_all(MAGIC_NUMBER)?;

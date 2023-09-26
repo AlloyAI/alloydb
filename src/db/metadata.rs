@@ -1,4 +1,5 @@
-use std::collections::HashMap;
+use anyhow::Result;
+use std::{collections::HashMap, fs::File};
 use uuid::Uuid;
 
 // Define the sizes in bytes of each possible type for custom fields.
@@ -53,7 +54,7 @@ pub struct MetaData {
     pub id: Uuid,
     pub original_text: String,
     pub vector_offset: u64,
-    pub custom_fields: HashMap<String, FieldValue>,
+    pub custom_fields: Option<HashMap<String, FieldValue>>,
 }
 
 impl MetaData {
@@ -61,7 +62,7 @@ impl MetaData {
         id: Uuid,
         original_text: String,
         vector_offset: u64,
-        custom_fields: HashMap<String, FieldValue>,
+        custom_fields: Option<HashMap<String, FieldValue>>,
     ) -> Self {
         MetaData {
             id,
@@ -74,28 +75,34 @@ impl MetaData {
     pub fn size(&self) -> usize {
         let mut total_size = SIZE_UUID + self.dynamic_string_size(&self.original_text) + SIZE_U64;
 
-        for (key, value) in &self.custom_fields {
-            // Size of the key string and its length prefix
-            total_size += self.dynamic_string_size(key);
+        if let Some(custom_fields) = &self.custom_fields {
+            for (key, value) in custom_fields {
+                // Size of the key string and its length prefix
+                total_size += self.dynamic_string_size(key);
 
-            // Size based on the field type
-            total_size += match value {
-                FieldValue::UUIDValue(_) => SIZE_UUID,
-                FieldValue::StringValue(s) => self.dynamic_string_size(&s),
-                FieldValue::U8Value(_) => SIZE_U8,
-                FieldValue::U16Value(_) => SIZE_U16,
-                FieldValue::U32Value(_) => SIZE_U32,
-                FieldValue::U64Value(_) => SIZE_U64,
-                FieldValue::I8Value(_) => SIZE_I8,
-                FieldValue::I16Value(_) => SIZE_I16,
-                FieldValue::I32Value(_) => SIZE_I32,
-                FieldValue::I64Value(_) => SIZE_I64,
-                FieldValue::F32Value(_) => SIZE_F32,
-                FieldValue::F64Value(_) => SIZE_F64,
-            };
+                // Size based on the field type
+                total_size += match value {
+                    FieldValue::UUIDValue(_) => SIZE_UUID,
+                    FieldValue::StringValue(s) => self.dynamic_string_size(&s),
+                    FieldValue::U8Value(_) => SIZE_U8,
+                    FieldValue::U16Value(_) => SIZE_U16,
+                    FieldValue::U32Value(_) => SIZE_U32,
+                    FieldValue::U64Value(_) => SIZE_U64,
+                    FieldValue::I8Value(_) => SIZE_I8,
+                    FieldValue::I16Value(_) => SIZE_I16,
+                    FieldValue::I32Value(_) => SIZE_I32,
+                    FieldValue::I64Value(_) => SIZE_I64,
+                    FieldValue::F32Value(_) => SIZE_F32,
+                    FieldValue::F64Value(_) => SIZE_F64,
+                };
+            }
         }
 
         total_size
+    }
+
+    pub fn write(&self, file: &mut File) -> Result<()> {
+        unimplemented!()
     }
 
     fn dynamic_string_size(&self, s: &String) -> usize {
