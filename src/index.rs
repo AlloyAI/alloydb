@@ -83,7 +83,7 @@ impl Index {
     pub fn get_vector(&self, id: &str) -> Result<Option<VectorRecord>> {
         let key = format!("{}.{}.{}", self.name, VECTOR_PREFIX, id);
         let value = self
-            .metadata_tree
+            .vector_data_tree
             .get(key)?
             .map(|v| serde_json::from_slice(&v))
             .transpose()?;
@@ -93,7 +93,10 @@ impl Index {
 
     /// Get all metadata records in the index.
     fn all_metadata(&self) -> Result<Vec<MetadataRecord>> {
-        let iter = self.metadata_tree.scan_prefix(METADATA_PREFIX).values();
+        let iter = self
+            .metadata_tree
+            .scan_prefix(format!("{}.{}", self.name, METADATA_PREFIX))
+            .values();
 
         let mut results = Vec::new();
 
@@ -109,7 +112,10 @@ impl Index {
 
     /// Get all metadata records in the index.
     fn all_vectors(&self) -> Result<Vec<VectorRecord>> {
-        let iter = self.metadata_tree.scan_prefix(VECTOR_PREFIX).values();
+        let iter = self
+            .metadata_tree
+            .scan_prefix(format!("{}.{}", self.name, VECTOR_PREFIX))
+            .values();
 
         let mut results = Vec::new();
 
@@ -140,23 +146,8 @@ impl Index {
         id: Option<&str>,
         metadata: Option<&HashMap<String, Value>>,
     ) -> Result<Vec<VectorRecord>> {
+        let mut vector_records = Vec::<VectorRecord>::new();
         let mut metadata_records: Vec<MetadataRecord> = Vec::new();
-
-        // If metadata is provided, scan and filter the records
-        if let Some(search_metadata) = metadata {
-            let iter = self.metadata_tree.scan_prefix(METADATA_PREFIX).values();
-
-            for value in iter {
-                let record = serde_json::from_slice::<MetadataRecord>(&value?)?;
-
-                if &record.metadata == search_metadata {
-                    metadata_records.push(record);
-                }
-            }
-        }
-
-        // Now find the associated vector records
-        let mut vector_records = Vec::<VectorRecord>::with_capacity(metadata_records.len());
 
         // If an ID is provided, directly fetch and return the corresponding record
         if let Some(record_id) = id {
@@ -167,7 +158,22 @@ impl Index {
 
                 return Ok(vector_records);
             }
-        } else {
+        }
+
+        // If metadata is provided, scan and filter the records
+        if let Some(search_metadata) = metadata {
+            let iter = self
+                .metadata_tree
+                .scan_prefix(format!("{}.{}", self.name, METADATA_PREFIX))
+                .values();
+
+            for value in iter {
+                let record = serde_json::from_slice::<MetadataRecord>(&value?)?;
+
+                if &record.metadata == search_metadata {
+                    metadata_records.push(record);
+                }
+            }
             // Otherwise search through the metadata records and fetch the corresponding vector records
             for metadata_record in metadata_records {
                 let key = format!(
@@ -196,7 +202,6 @@ impl Index {
 
 #[cfg(test)]
 mod tests {
-    use serde_json::json;
 
     use super::*;
     use tempfile::tempdir;
@@ -247,12 +252,9 @@ mod tests {
         let index = Index::new("test", &db)?;
 
         let metadata1 = HashMap::from([("foo".to_owned(), Value::from("bar"))]);
-        let metadata2 = HashMap::from([("baz".to_owned(), Value::from("qux"))]);
         let vector1 = vec![1.0, 2.0, 3.0];
-        let vector2 = vec![4.0, 5.0, 6.0];
 
         index.insert(metadata1.clone(), vector1.clone())?;
-        index.insert(metadata2.clone(), vector2.clone())?;
 
         let search_metadata = HashMap::from([("foo".to_owned(), Value::from("bar"))]);
         let records = index.query(None, Some(&search_metadata))?;
