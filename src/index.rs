@@ -55,18 +55,20 @@ impl Index {
         let vector_bytes = serde_json::to_vec(&vector_record)?;
 
         self.metadata_tree.insert(
-            format!("{}.{}", METADATA_PREFIX, uuid.clone()),
+            format!("{}.{}.{}", self.name, METADATA_PREFIX, uuid.clone()),
             metadata_bytes,
         )?;
-        self.vector_data_tree
-            .insert(format!("{}.{}", VECTOR_PREFIX, uuid), vector_bytes)?;
+        self.vector_data_tree.insert(
+            format!("{}.{}.{}", self.name, VECTOR_PREFIX, uuid),
+            vector_bytes,
+        )?;
 
         Ok(())
     }
 
     /// Gets a metadata record from the index.
     pub fn get_metadata(&self, id: &str) -> Result<Option<MetadataRecord>> {
-        let key = format!("{}.{}", METADATA_PREFIX, id);
+        let key = format!("{}.{}.{}", self.name, METADATA_PREFIX, id);
         let value = self
             .metadata_tree
             .get(key)?
@@ -78,7 +80,7 @@ impl Index {
 
     /// Gets a vector record from the index.
     pub fn get_vector(&self, id: &str) -> Result<Option<VectorRecord>> {
-        let key = format!("{}.{}", VECTOR_PREFIX, id);
+        let key = format!("{}.{}.{}", self.name, VECTOR_PREFIX, id);
         let value = self
             .metadata_tree
             .get(key)?
@@ -119,6 +121,9 @@ impl Index {
         Ok(results)
     }
 
+    // NOTE (Casey): This is a very naive implementation of querying. It will be replaced with a
+    // dynamic index based querying system for metadata and an id index. Database Indexes not to be confused with
+    // our internal Index struct.
     /// Queries the index for records matching the given metadata.
     ///
     /// # Arguments
@@ -129,40 +134,58 @@ impl Index {
     /// # Returns
     ///
     /// A vector of records matching the given metadata.
-    fn query(
+    pub fn query(
         &self,
         id: Option<&str>,
         metadata: Option<&HashMap<String, Value>>,
-    ) -> Result<Vec<MetadataRecord>> {
-        // If an ID is provided, directly fetch and return the corresponding record
-        if let Some(record_id) = id {
-            let key = format!("{}.{}", METADATA_PREFIX, record_id);
-            let value = self.metadata_tree.get(&key)?;
-            if let Some(v) = value {
-                let record = serde_json::from_slice::<MetadataRecord>(&v)?;
-                return Ok(vec![record]);
-            } else {
-                return Ok(Vec::new()); // Or return an error if not found
-            }
-        }
+    ) -> Result<Vec<VectorRecord>> {
+        let mut metadata_records: Vec<MetadataRecord> = Vec::new();
 
         // If metadata is provided, scan and filter the records
         if let Some(search_metadata) = metadata {
             let iter = self.metadata_tree.scan_prefix(METADATA_PREFIX).values();
-            let mut results = Vec::new();
+            let mut results = Vec::<MetadataRecord>::new();
 
             for value in iter {
                 let record = serde_json::from_slice::<MetadataRecord>(&value?)?;
 
                 if &record.metadata == search_metadata {
-                    results.push(record);
+                    metadata_records.push(record);
                 }
             }
-
-            return Ok(results);
         }
 
-        // TODO: Add vectory similarity search after finding the metadata
+        // Now find the associated vector records
+        let mut vector_records = Vec::<VectorRecord>::with_capacity(metadata_records.len());
+
+        // If an ID is provided, directly fetch and return the corresponding record
+        if let Some(record_id) = id {
+            let key = format!("{}.{}.{}", self.name, VECTOR_PREFIX, record_id);
+            let value = self.vector_data_tree.get(&key)?;
+            if let Some(v) = value {
+                vector_records.push(serde_json::from_slice::<VectorRecord>(&v)?);
+
+                return Ok(vector_records);
+            }
+        } else {
+            // Otherwise search through the metadata records and fetch the corresponding vector records
+            for metadata_record in metadata_records {
+                let key = format!(
+                    "{}.{}.{}",
+                    self.name,
+                    VECTOR_PREFIX,
+                    metadata_record.get_id()
+                );
+                let value = self.vector_data_tree.get(&key)?;
+                if let Some(v) = value {
+                    vector_records.push(serde_json::from_slice::<VectorRecord>(&v)?);
+                };
+            }
+
+            return Ok(vector_records);
+        }
+
+        // TODO (Casey): Add vectory similarity search after finding the vector records
 
         // If neither ID nor metadata is provided
         Err(anyhow::anyhow!(

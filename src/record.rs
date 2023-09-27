@@ -17,7 +17,7 @@ impl MetadataRecord {
         }
     }
 
-    pub fn id(&self) -> &String {
+    pub fn get_id(&self) -> &String {
         &self.id
     }
 }
@@ -36,7 +36,7 @@ impl VectorRecord {
         }
     }
 
-    pub fn id(&self) -> &String {
+    pub fn get_id(&self) -> &String {
         &self.id
     }
 }
