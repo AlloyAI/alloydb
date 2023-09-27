@@ -17,9 +17,10 @@ impl AlloyDB {
         Ok(Self { db, indexes })
     }
 
-    pub fn create_index(&mut self, name: &str) -> Result<()> {
-        let index = Index::new(name, &self.db)?;
-        self.indexes.insert(name.to_owned(), index);
+    /// Creates a new index based on a given field for the database
+    pub fn create_index(&mut self, field: &str) -> Result<()> {
+        let index = Index::new(field, &self.db)?;
+        self.indexes.insert(field.to_owned(), index);
 
         Ok(())
     }
@@ -29,8 +30,20 @@ impl AlloyDB {
             .indexes
             .get(index_id)
             .ok_or_else(|| anyhow!("Index not found"))?;
-        index.insert(record)?;
 
         Ok(())
+    }
+
+    /// Queries the DB for records matching the given metadata.
+    ///
+    /// # Arguments
+    ///
+    /// * `metadata` - The metadata to match.
+    ///
+    /// # Returns
+    ///
+    /// A vector of records matching the given metadata.
+    pub fn query(&self, metadata: serde_json::Value) -> Result<Vec<Record>> {
+        unimplemented!()
     }
 }
