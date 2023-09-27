@@ -42,8 +42,9 @@ impl Index {
     ///
     /// # Arguments
     ///
-    /// * `record` - The record to insert.
-    pub fn insert(&self, metadata: HashMap<String, Value>, vector: Vec<f32>) -> Result<()> {
+    /// * `metadata` - The metadata record to insert.
+    /// * `vector` - The vector record to insert.
+    pub fn insert(&self, metadata: HashMap<String, Value>, vector: Vec<f32>) -> Result<String> {
         let uuid = Uuid::new_v4().to_string();
 
         let metadata_record = MetadataRecord::new(&uuid, metadata);
@@ -63,7 +64,7 @@ impl Index {
             vector_bytes,
         )?;
 
-        Ok(())
+        Ok(uuid)
     }
 
     /// Gets a metadata record from the index.
@@ -91,7 +92,7 @@ impl Index {
     }
 
     /// Get all metadata records in the index.
-    pub fn all_metadata(&self) -> Result<Vec<MetadataRecord>> {
+    fn all_metadata(&self) -> Result<Vec<MetadataRecord>> {
         let iter = self.metadata_tree.scan_prefix(METADATA_PREFIX).values();
 
         let mut results = Vec::new();
@@ -107,7 +108,7 @@ impl Index {
     }
 
     /// Get all metadata records in the index.
-    pub fn all_vectors(&self) -> Result<Vec<VectorRecord>> {
+    fn all_vectors(&self) -> Result<Vec<VectorRecord>> {
         let iter = self.metadata_tree.scan_prefix(VECTOR_PREFIX).values();
 
         let mut results = Vec::new();
@@ -144,7 +145,6 @@ impl Index {
         // If metadata is provided, scan and filter the records
         if let Some(search_metadata) = metadata {
             let iter = self.metadata_tree.scan_prefix(METADATA_PREFIX).values();
-            let mut results = Vec::<MetadataRecord>::new();
 
             for value in iter {
                 let record = serde_json::from_slice::<MetadataRecord>(&value?)?;
@@ -191,5 +191,98 @@ impl Index {
         Err(anyhow::anyhow!(
             "Either ID or metadata should be provided for query"
         ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_insert_and_get() -> Result<()> {
+        let dir = tempdir()?;
+        let db = sled::open(&dir)?;
+        let index = Index::new("test", &db)?;
+
+        let metadata = HashMap::new();
+        let vector = vec![1.0, 2.0, 3.0];
+
+        let id = index.insert(metadata.clone(), vector.clone())?;
+
+        let metadata_record = index.get_metadata(&id)?.unwrap();
+        let vector_record = index.get_vector(&id)?.unwrap();
+
+        assert_eq!(metadata_record.metadata, metadata);
+        assert_eq!(vector_record.values, vector);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_query_by_id() -> Result<()> {
+        let dir = tempdir()?;
+        let db = sled::open(&dir)?;
+        let index = Index::new("test", &db)?;
+
+        let metadata = HashMap::new();
+        let vector = vec![1.0, 2.0, 3.0];
+
+        let id = index.insert(metadata.clone(), vector.clone())?;
+
+        let records = index.query(Some(&id), None)?;
+
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].values, vector);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_query_by_metadata() -> Result<()> {
+        let dir = tempdir()?;
+        let db = sled::open(&dir)?;
+        let index = Index::new("test", &db)?;
+
+        let metadata1 = HashMap::from([("foo".to_owned(), Value::from("bar"))]);
+        let metadata2 = HashMap::from([("baz".to_owned(), Value::from("qux"))]);
+        let vector1 = vec![1.0, 2.0, 3.0];
+        let vector2 = vec![4.0, 5.0, 6.0];
+
+        index.insert(metadata1.clone(), vector1.clone())?;
+        index.insert(metadata2.clone(), vector2.clone())?;
+
+        let search_metadata = HashMap::from([("foo".to_owned(), Value::from("bar"))]);
+        let records = index.query(None, Some(&search_metadata))?;
+
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].values, vector1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_query_by_id_and_metadata() -> Result<()> {
+        let dir = tempdir()?;
+        let db = sled::open(&dir)?;
+        let index = Index::new("test", &db)?;
+
+        let metadata1 = HashMap::from([("foo".to_owned(), Value::from("bar"))]);
+        // let metadata2 = HashMap::from([("baz".to_owned(), Value::from("qux"))]);
+        let vector1 = vec![1.0, 2.0, 3.0];
+        // let vector2 = vec![4.0, 5.0, 6.0];
+
+        let id1 = index.insert(metadata1.clone(), vector1.clone())?;
+        // let id2 = index.insert(metadata2.clone(), vector2.clone())?;
+
+        let search_metadata = HashMap::from([("foo".to_owned(), Value::from("bar"))]);
+        let records = index.query(Some(&id1), Some(&search_metadata))?;
+
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].values, vector1);
+
+        Ok(())
     }
 }

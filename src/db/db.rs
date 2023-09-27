@@ -3,7 +3,12 @@ use std::collections::HashMap;
 use anyhow::{anyhow, Result};
 use sled::Db;
 
-use crate::{index::Index, record::Record};
+use crate::index::Index;
+
+pub struct Record {
+    pub metadata: HashMap<String, serde_json::Value>,
+    pub vector: Vec<f32>,
+}
 
 pub struct AlloyDB {
     pub db: Db,
@@ -30,6 +35,7 @@ impl AlloyDB {
             .indexes
             .get(index_id)
             .ok_or_else(|| anyhow!("Index not found"))?;
+        index.insert(record.metadata, record.vector)?;
 
         Ok(())
     }
@@ -43,7 +49,7 @@ impl AlloyDB {
     /// # Returns
     ///
     /// A vector of records matching the given metadata.
-    pub fn query(&self, metadata: serde_json::Value) -> Result<Vec<Record>> {
+    pub fn query(&self) -> Result<Vec<Record>> {
         unimplemented!()
     }
 }
