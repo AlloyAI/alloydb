@@ -92,7 +92,7 @@ impl Index {
     }
 
     /// Get all metadata records in the index.
-    fn all_metadata(&self) -> Result<Vec<MetadataRecord>> {
+    pub fn all_metadata(&self) -> Result<Vec<MetadataRecord>> {
         let iter = self
             .metadata_tree
             .scan_prefix(format!("{}.{}", self.name, METADATA_PREFIX))
@@ -111,7 +111,7 @@ impl Index {
     }
 
     /// Get all metadata records in the index.
-    fn all_vectors(&self) -> Result<Vec<VectorRecord>> {
+    pub fn all_vectors(&self) -> Result<Vec<VectorRecord>> {
         let iter = self
             .metadata_tree
             .scan_prefix(format!("{}.{}", self.name, VECTOR_PREFIX))
@@ -197,6 +197,27 @@ impl Index {
         Err(anyhow::anyhow!(
             "Either ID or metadata should be provided for query"
         ))
+    }
+
+    /// Deletes a record from the index.
+    /// This will delete both the metadata and associated vector data.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - The ID of the record to delete.
+    ///
+    /// # Returns
+    ///
+    /// An empty result or an Err.
+
+    pub fn delete(&self, id: &str) -> Result<()> {
+        let metadata_key = format!("{}.{}.{}", self.name, METADATA_PREFIX, id);
+        let vector_key = format!("{}.{}.{}", self.name, VECTOR_PREFIX, id);
+
+        self.metadata_tree.remove(metadata_key)?;
+        self.vector_data_tree.remove(vector_key)?;
+
+        Ok(())
     }
 }
 
@@ -284,6 +305,28 @@ mod tests {
 
         assert_eq!(records.len(), 1);
         assert_eq!(records[0].values, vector1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_delete() -> Result<()> {
+        let dir = tempdir()?;
+        let db = sled::open(&dir)?;
+        let index = Index::new("test", &db)?;
+
+        let metadata = HashMap::new();
+        let vector = vec![1.0, 2.0, 3.0];
+
+        let id = index.insert(metadata.clone(), vector.clone())?;
+
+        index.delete(&id)?;
+
+        let metadata_record = index.get_metadata(&id)?;
+        let vector_record = index.get_vector(&id)?;
+
+        assert!(metadata_record.is_none());
+        assert!(vector_record.is_none());
 
         Ok(())
     }

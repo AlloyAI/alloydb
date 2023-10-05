@@ -23,11 +23,10 @@ impl AlloyDB {
     }
 
     /// Creates a new index based on a given field for the database
-    pub fn create_index(&mut self, field: &str) -> Result<()> {
+    pub fn create_index(&mut self, field: &str) -> Result<Index> {
         let index = Index::new(field, &self.db)?;
-        self.indexes.insert(field.to_owned(), index);
 
-        Ok(())
+        Ok(index)
     }
 
     pub fn upsert(&self, index_id: &str, record: Record) -> Result<()> {
