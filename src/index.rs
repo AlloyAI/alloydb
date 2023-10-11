@@ -18,6 +18,8 @@ pub struct Index {
     pub metadata_tree: Tree,
     /// The tree used to store the vector data
     pub vector_data_tree: Tree,
+    /// The dimension of the vectors stored in the index
+    pub dimension: usize,
 }
 
 impl Index {
@@ -27,7 +29,7 @@ impl Index {
     ///
     /// * `name` - The name of the index.
     /// * `db` - The database to use for storing the data.
-    pub fn new(name: &str, db: &Db) -> Result<Self> {
+    pub fn new(name: &str, db: &Db, dimension: usize) -> Result<Self> {
         let metadata_tree = db.open_tree(format!("{}.meta.data", name))?;
         let vector_data_tree = db.open_tree(format!("{}.vector.data", name))?;
 
@@ -35,6 +37,7 @@ impl Index {
             name: name.to_owned(),
             metadata_tree,
             vector_data_tree,
+            dimension,
         })
     }
 
@@ -228,10 +231,22 @@ mod tests {
     use tempfile::tempdir;
 
     #[test]
+    fn test_new() -> Result<()> {
+        let dir = tempdir()?;
+        let db = sled::open(&dir)?;
+        let index = Index::new("test", &db, 3)?;
+
+        assert_eq!(index.name, "test");
+        assert_eq!(index.dimension, 3);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_insert_and_get() -> Result<()> {
         let dir = tempdir()?;
         let db = sled::open(&dir)?;
-        let index = Index::new("test", &db)?;
+        let index = Index::new("test", &db, 3)?;
 
         let metadata = HashMap::new();
         let vector = vec![1.0, 2.0, 3.0];
@@ -251,7 +266,7 @@ mod tests {
     fn test_query_by_id() -> Result<()> {
         let dir = tempdir()?;
         let db = sled::open(&dir)?;
-        let index = Index::new("test", &db)?;
+        let index = Index::new("test", &db, 3)?;
 
         let metadata = HashMap::new();
         let vector = vec![1.0, 2.0, 3.0];
@@ -270,7 +285,7 @@ mod tests {
     fn test_query_by_metadata() -> Result<()> {
         let dir = tempdir()?;
         let db = sled::open(&dir)?;
-        let index = Index::new("test", &db)?;
+        let index = Index::new("test", &db, 3)?;
 
         let metadata1 = HashMap::from([("foo".to_owned(), Value::from("bar"))]);
         let vector1 = vec![1.0, 2.0, 3.0];
@@ -290,7 +305,7 @@ mod tests {
     fn test_query_by_id_and_metadata() -> Result<()> {
         let dir = tempdir()?;
         let db = sled::open(&dir)?;
-        let index = Index::new("test", &db)?;
+        let index = Index::new("test", &db, 3)?;
 
         let metadata1 = HashMap::from([("foo".to_owned(), Value::from("bar"))]);
         // let metadata2 = HashMap::from([("baz".to_owned(), Value::from("qux"))]);
@@ -313,7 +328,7 @@ mod tests {
     fn test_delete() -> Result<()> {
         let dir = tempdir()?;
         let db = sled::open(&dir)?;
-        let index = Index::new("test", &db)?;
+        let index = Index::new("test", &db, 3)?;
 
         let metadata = HashMap::new();
         let vector = vec![1.0, 2.0, 3.0];

@@ -13,6 +13,7 @@ anyhow = "1.0.75"
 sled = "0.34.7"
 serde_json = "1.0.107"
 tempfile = "3.8.0"
+usearch = "2.6.0"
 [dependencies.uuid]
 version = "1.4.1"
 features = [
