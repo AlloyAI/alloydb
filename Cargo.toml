@@ -10,7 +10,9 @@ serde = "1.0.188"
 tokio = "1.32.0"
 tokenizers = "0.14.0"
 anyhow = "1.0.75"
-rkyv = "0.7.42"
+sled = "0.34.7"
+serde_json = "1.0.107"
+tempfile = "3.8.0"
 [dependencies.uuid]
 version = "1.4.1"
 features = [
